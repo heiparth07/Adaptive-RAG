@@ -1,14 +1,11 @@
 """
 Document upload and processing module.
 """
-
 import os
 import tempfile
-
 from fastapi import UploadFile, File
-from langchain_community.document_loaders import PyPDFLoader, TextLoader
+from langchain_community.document_loaders import PyPDFLoader, TextLoader, Docx2txtLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-
 from src.rag.retriever_setup import retriever_chain
 from src.tools.common_tools import enhance_description_with_llm
 
@@ -16,13 +13,12 @@ from src.tools.common_tools import enhance_description_with_llm
 def documents(description: str, file: UploadFile = File(...)):
     """
     Process and upload a document for RAG.
-
     Validates file type, loads content, enhances description, chunks documents,
     and stores them in the vector database.
 
     Args:
         description: User-provided document description.
-        file: The uploaded file (PDF or TXT).
+        file: The uploaded file (PDF, TXT, or DOCX).
 
     Returns:
         Boolean indicating success of the upload process.
@@ -32,11 +28,13 @@ def documents(description: str, file: UploadFile = File(...)):
     """
     filename = file.filename
     print(filename)
-    if not filename.endswith(".pdf") and not filename.endswith(".txt"):
+
+    # Validate file type
+    if not filename.endswith(".pdf") and not filename.endswith(".txt") and not filename.endswith(".docx"):
         from fastapi import HTTPException
         raise HTTPException(
             status_code=400,
-            detail="Only PDF and TXT files are supported"
+            detail="Only PDF, TXT and DOCX files are supported"
         )
 
     file_bytes = file.file.read()
@@ -48,8 +46,11 @@ def documents(description: str, file: UploadFile = File(...)):
         tmp_file.write(file_bytes)
         tmp_path = tmp_file.name
 
+    # Load the file using the appropriate loader
     if filename.endswith(".pdf"):
         loader = PyPDFLoader(tmp_path)
+    elif filename.endswith(".docx"):
+        loader = Docx2txtLoader(tmp_path)
     else:
         loader = TextLoader(tmp_path, encoding="utf-8")
 
@@ -83,7 +84,3 @@ def documents(description: str, file: UploadFile = File(...)):
     chunks = splitter.split_documents(docs)
 
     return retriever_chain(chunks)
-
-
-
-
