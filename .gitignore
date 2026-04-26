@@ -1,2 +1,16 @@
-venv/
+# Environment
 .env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs
+app.log
+
+# Runtime files
+description.txt
+
+# Virtual environment
+venv/
