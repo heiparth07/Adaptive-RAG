@@ -1,16 +1,25 @@
 """
 API routes for RAG operations.
 """
-
-from fastapi import APIRouter, UploadFile, File, Header
+from fastapi import APIRouter, UploadFile, File, Header, HTTPException
 from langchain_core.messages import HumanMessage, AIMessage
-
 from src.memory.chat_history_mongo import ChatHistory
 from src.models.query_request import QueryRequest
 from src.rag.document_upload import documents
 from src.rag.graph_builder import builder
 
 router = APIRouter()
+
+
+@router.get("/health")
+def health_check():
+    """
+    Health check endpoint to verify the API is running.
+
+    Returns:
+        dict: Status of the API.
+    """
+    return {"status": "ok", "message": "Adaptive RAG API is running"}
 
 
 @router.post("/rag/query")
@@ -24,7 +33,12 @@ async def rag_query(req: QueryRequest):
     Returns:
         The generated response from the RAG pipeline.
     """
-    #chat_history=ChatInMemoryHistory.get_session_history(req.token)
+    # Input validation
+    if not req.query or len(req.query.strip()) == 0:
+        raise HTTPException(status_code=400, detail="Query cannot be empty")
+    if len(req.query) > 2000:
+        raise HTTPException(status_code=400, detail="Query too long (max 2000 characters)")
+
     chat_history = ChatHistory.get_session_history(req.session_id)
     await chat_history.add_message(HumanMessage(content=req.query))
 
@@ -33,6 +47,7 @@ async def rag_query(req: QueryRequest):
     result = builder.invoke({
         "messages": messages
     })
+
     output_text = result["messages"][-1].content
 
     # Save assistant message
@@ -59,3 +74,22 @@ async def upload_file(
     status_upload = documents(description, file)
     return {"status": status_upload}
 
+
+@router.delete("/rag/session/{session_id}")
+async def clear_session(session_id: str):
+    """
+    Clear the chat history for a given session.
+
+    Args:
+        session_id: The session ID whose history should be deleted.
+
+    Returns:
+        Confirmation message.
+    """
+    if not session_id or len(session_id.strip()) == 0:
+        raise HTTPException(status_code=400, detail="Session ID cannot be empty")
+
+    chat_history = ChatHistory.get_session_history(session_id)
+    await chat_history.clear()
+
+    return {"status": "success", "message": f"Chat history cleared for session: {session_id}"}
