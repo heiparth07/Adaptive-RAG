@@ -1,0 +1,11 @@
+# Lean, hermetic test dependencies.
+# The suite mocks all external services (LLM, Mongo, vector store, web search),
+# so it needs only the import-time libraries — no faiss / qdrant / openai / motor.
+pytest
+httpx
+python-multipart
+fastapi
+pydantic
+pyyaml
+langchain-core
+langgraph
